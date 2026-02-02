@@ -2,11 +2,12 @@
 <html lang="nl">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Opsporing: Decor & Trechteren (Street View)</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     <style>
-        :root { --police-blue: #1d4e89; --gold: #ffd700; --bg: #f4f7f9; }
+        :root { --police-blue: #1d4e89; --gold: #ffd700; --bg: #f4f7f9; --success: #28a745; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg); margin: 0; padding: 20px; color: #2d3748; }
         .container { max-width: 1200px; margin: auto; }
         
@@ -22,10 +23,10 @@
         .input-container { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
         textarea { width: 100%; height: 250px; padding: 15px; border: 1px solid #cbd5e0; border-radius: 4px; font-family: inherit; box-sizing: border-box; resize: none; font-size: 1em; }
         
-        .btn-send { background: #28a745; color: white; border: none; padding: 15px; width: 100%; font-weight: bold; cursor: pointer; text-transform: uppercase; margin-top: 10px; border-radius: 4px; }
+        .btn-send { background: var(--success); color: white; border: none; padding: 15px; width: 100%; font-weight: bold; cursor: pointer; text-transform: uppercase; margin-top: 10px; border-radius: 4px; }
         .btn-admin { background: var(--police-blue); color: white; border: none; padding: 10px 20px; cursor: pointer; border-radius: 4px; font-weight: bold; }
 
-        /* --- LIVE FEED VERBETERDE LEESBAARHEID --- */
+        /* LIVE FEED */
         .aangifte-kaart { 
             background: white; 
             margin-top: 30px; 
@@ -42,7 +43,7 @@
         .tekst-sectie strong { font-size: 1.2em; color: var(--police-blue); display: block; margin-bottom: 15px; }
         .pv-tekst { 
             white-space: pre-wrap; 
-            background: #fff; 
+            background: #f8fafc; 
             padding: 20px; 
             border: 1px solid #e2e8f0; 
             border-radius: 8px; 
@@ -51,19 +52,11 @@
             color: #1a202c; 
         }
 
-        .feedback-sectie { background: #fffbeb; padding: 25px; border-left: 4px solid var(--gold); }
+        .feedback-sectie { background: #fffbeb; padding: 25px; border-left: 4px solid var(--gold); display: flex; flex-direction: column; }
         .feedback-sectie h4 { margin: 0 0 15px 0; color: #856404; text-transform: uppercase; letter-spacing: 1px; font-size: 0.9em; }
 
         .vinklijst { list-style: none; padding: 0; margin-bottom: 20px; }
-        .vinklijst li { 
-            padding: 8px 12px; 
-            margin-bottom: 5px; 
-            border-radius: 6px; 
-            display: flex; 
-            align-items: center; 
-            transition: 0.3s;
-            font-weight: 500;
-        }
+        .vinklijst li { padding: 8px 12px; margin-bottom: 5px; border-radius: 6px; display: flex; align-items: center; font-weight: 500; }
         .vinklijst li.checked { background: #fef3c7; color: #92400e; }
         .vinklijst li.unchecked { opacity: 0.4; color: #a1a1aa; }
         .vinklijst input { margin-right: 15px; transform: scale(1.4); cursor: pointer; }
@@ -73,20 +66,40 @@
             border: 2px solid var(--gold); 
             padding: 15px; 
             border-radius: 8px; 
-            min-height: 80px; 
+            min-height: 50px; 
+            max-height: 200px;
+            overflow-y: auto;
             font-weight: 600;
             color: #1d4e89;
-            box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);
+            margin-bottom: 15px;
+            white-space: pre-wrap;
         }
         
         .feedback-editor { 
             width: 100%; 
-            height: 80px; 
-            margin-top: 10px; 
+            height: 100px; 
             padding: 10px; 
             border: 1px dashed #b45309; 
-            background: #fff9e6;
+            background: #fff;
             font-family: inherit;
+            box-sizing: border-box;
+            resize: vertical;
+        }
+
+        .btn-feedback-publiceer {
+            background: var(--police-blue);
+            color: white;
+            border: none;
+            padding: 10px;
+            margin-top: 5px;
+            cursor: pointer;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+
+        @media (max-width: 900px) {
+            .workspace, .aangifte-kaart { grid-template-columns: 1fr; }
+            .feedback-sectie { border-left: none; border-top: 4px solid var(--gold); }
         }
     </style>
 </head>
@@ -99,7 +112,7 @@
 
     <div class="admin-panel">
         <strong>DOCENT:</strong> 
-        <input type="text" id="locatie-input" placeholder="Adres voor Street View">
+        <input type="text" id="locatie-input" placeholder="Adres (bijv. Dam 1, Amsterdam)">
         <button class="btn-admin" onclick="wijzigLocatie()">LOCATIE UPDATEN</button>
         <button class="btn-admin" style="background:#e53e3e;" onclick="wisAlles()">FEED RESETTEN</button>
     </div>
@@ -115,7 +128,7 @@
             <div class="instruction-box" style="background: #eef2ff; border-left: 4px solid var(--police-blue); padding: 10px; font-size: 0.85em; margin-bottom: 10px;">
                 <strong>METHODIEK:</strong> Verbalisant positie -> Links naar Rechts -> Groot naar Klein.
             </div>
-            <textarea id="input-tekst" placeholder="Typ hier de beschrijving..."></textarea>
+            <textarea id="input-tekst" placeholder="Typ hier de volledige decorbeschrijving..."></textarea>
             <button class="btn-send" onclick="verstuurData()">Publiceer voor de klas</button>
         </div>
     </div>
@@ -125,7 +138,7 @@
 </div>
 
 <script>
-    // --- FIREBASE CONFIG (Jouw gegevens) ---
+    // --- FIREBASE CONFIG ---
     const firebaseConfig = {
         apiKey: "AIzaSyB12mTMBnuxdC4W4htyFO_C7Dnh3maVKew",
         authDomain: "decoroefening.firebaseapp.com",
@@ -137,6 +150,7 @@
     firebase.initializeApp(firebaseConfig);
     const database = firebase.database();
 
+    // --- LOCATIE FUNCTIES ---
     function wijzigLocatie() {
         const nieuwAdres = document.getElementById('locatie-input').value;
         if(nieuwAdres) database.ref('decor_instellingen').update({ huidige_locatie: nieuwAdres });
@@ -145,39 +159,64 @@
     database.ref('decor_instellingen/huidige_locatie').on('value', (snapshot) => {
         const locatie = snapshot.val() || "Utrecht Centraal";
         document.getElementById('huidige-locatie-titel').innerText = "📍 Locatie: " + locatie;
-        document.getElementById('map-iframe').src = `https://www.google.com/maps?q=${encodeURIComponent(locatie)}&output=embed`;
+        // Gebruik de standaard Google Maps Embed URL voor adressen
+        document.getElementById('map-iframe').src = `https://maps.google.com/maps?q=${encodeURIComponent(locatie)}&t=&z=15&ie=UTF8&iwloc=&output=embed`;
     });
 
+    // --- DATA VERZENDEN ---
     function verstuurData() {
         const naam = document.getElementById('student-naam').value;
         const tekst = document.getElementById('input-tekst').value;
-        if(!naam || !tekst) return alert("Naam en tekst verplicht.");
+        if(!naam || !tekst) return alert("Vul je naam en de beschrijving in.");
+        
         database.ref('decor_oefeningen').push({
             naam: naam,
             tekst: tekst,
             feedback: { c1:false, c2:false, c3:false, c4:false, c5:false, c6:false, opmerking: "" }
         });
         document.getElementById('input-tekst').value = '';
+        alert("Inzending gepubliceerd!");
     }
 
-    function updateCheck(key, field, value) { database.ref('decor_oefeningen/' + key + '/feedback').update({ [field]: value }); }
-    function liveFeedback(key, value) { database.ref('decor_oefeningen/' + key + '/feedback').update({ opmerking: value }); }
-    function wisAlles() { if(confirm("Feed wissen?")) database.ref('decor_oefeningen').remove(); }
+    // --- FEEDBACK FUNCTIES ---
+    function updateCheck(key, field, value) { 
+        database.ref('decor_oefeningen/' + key + '/feedback').update({ [field]: value }); 
+    }
 
+    function publiceerFeedback(key) {
+        const feedbackTekst = document.getElementById(`editor-${key}`).value;
+        database.ref('decor_oefeningen/' + key + '/feedback').update({ 
+            opmerking: feedbackTekst 
+        });
+    }
+
+    function wisAlles() { 
+        if(confirm("Weet je zeker dat je de hele feed wilt wissen?")) database.ref('decor_oefeningen').remove(); 
+    }
+
+    // --- LIVE FEED RENDEREN ---
     database.ref('decor_oefeningen').on('value', (snapshot) => {
         const feed = document.getElementById('live-feed');
         feed.innerHTML = '';
         const data = snapshot.val();
+        
         if (data) {
             Object.keys(data).reverse().forEach(key => {
                 const item = data[key];
                 const fb = item.feedback || {};
                 const kaart = document.createElement('div');
                 kaart.className = 'aangifte-kaart';
+                
                 kaart.innerHTML = `
                     <div class="tekst-sectie">
                         <strong>Verbalisant: ${item.naam}</strong>
                         <div class="pv-tekst">${item.tekst}</div>
+                        
+                        ${fb.opmerking ? `
+                        <div style="margin-top:20px; border-top: 2px solid var(--gold); padding-top:15px;">
+                            <strong style="font-size:0.9em; color:#856404;">DEFINITIEVE FEEDBACK:</strong>
+                            <p style="color: #1d4e89; font-style: italic; background: #f0f4f8; padding: 10px; border-radius: 5px;">${fb.opmerking}</p>
+                        </div>` : ''}
                     </div>
                     <div class="feedback-sectie">
                         <h4>Beoordeling & Feedback</h4>
@@ -189,12 +228,15 @@
                             <li class="${fb.c5?'checked':'unchecked'}"><input type="checkbox" ${fb.c5?'checked':''} onchange="updateCheck('${key}','c5',this.checked)"> Van groot naar klein</li>
                             <li class="${fb.c6?'checked':'unchecked'}"><input type="checkbox" ${fb.c6?'checked':''} onchange="updateCheck('${key}','c6',this.checked)"> Element = Onderwerp</li>
                         </ul>
-                        <div class="feedback-display">${fb.opmerking || "Nog geen opmerkingen geplaatst..." }</div>
-                        <textarea class="feedback-editor" oninput="liveFeedback('${key}', this.value)" placeholder="Docent: Typ hier feedback...">${fb.opmerking || ""}</textarea>
+                        <div class="feedback-display">${fb.opmerking || "Nog geen definitieve feedback..." }</div>
+                        <textarea id="editor-${key}" class="feedback-editor" placeholder="Typ hier de feedback (meer dan 100 woorden mogelijk)...">${fb.opmerking || ""}</textarea>
+                        <button class="btn-feedback-publiceer" onclick="publiceerFeedback('${key}')">FEEDBACK PUBLICEREN</button>
                     </div>
                 `;
                 feed.appendChild(kaart);
             });
+        } else {
+            feed.innerHTML = '<p style="text-align:center; color:#666;">Geen inzendingen gevonden.</p>';
         }
     });
 </script>
