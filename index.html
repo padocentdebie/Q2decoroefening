@@ -7,8 +7,8 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     <style>
-        :root { --police-blue: #1d4e89; --gold: #ffd700; --bg: #f4f7f9; --success: #28a745; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg); margin: 0; padding: 20px; color: #2d3748; }
+        :root { --police-blue: #1d4e89; --gold: #ffd700; --bg: #f4f7f9; --success: #28a745; --danger: #e53e3e; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg); margin: 0; padding: 20px; color: #2d3748; padding-bottom: 100px; }
         .container { max-width: 1200px; margin: auto; }
         
         .header { background: var(--police-blue); color: white; padding: 20px; text-align: center; border-bottom: 5px solid var(--gold); border-radius: 4px 4px 0 0; }
@@ -97,6 +97,19 @@
             font-weight: bold;
         }
 
+        /* END OF LES PANEL */
+        .end-session-panel {
+            margin-top: 80px;
+            padding: 40px;
+            background: #2d3748;
+            color: white;
+            border-radius: 12px;
+            text-align: center;
+        }
+
+        .btn-download { background: var(--success); color: white; border: none; padding: 15px 30px; cursor: pointer; border-radius: 4px; font-weight: bold; margin: 10px; font-size: 1.1em; }
+        .btn-reset-final { background: var(--danger); color: white; border: none; padding: 15px 30px; cursor: pointer; border-radius: 4px; font-weight: bold; margin: 10px; font-size: 1.1em; }
+
         @media (max-width: 900px) {
             .workspace, .aangifte-kaart { grid-template-columns: 1fr; }
             .feedback-sectie { border-left: none; border-top: 4px solid var(--gold); }
@@ -114,7 +127,6 @@
         <strong>DOCENT:</strong> 
         <input type="text" id="locatie-input" placeholder="Adres (bijv. Dam 1, Amsterdam)">
         <button class="btn-admin" onclick="wijzigLocatie()">LOCATIE UPDATEN</button>
-        <button class="btn-admin" style="background:#e53e3e;" onclick="wisAlles()">FEED RESETTEN</button>
     </div>
 
     <div class="workspace">
@@ -135,6 +147,13 @@
 
     <h2 style="color: var(--police-blue); margin-top: 50px; text-align: center;">LIVE FEED ONDERWIJSMODUS</h2>
     <div id="live-feed">Wachten op inzendingen...</div>
+
+    <div class="end-session-panel">
+        <h3>Einde Les: Administratie & Opslag</h3>
+        <p>Download eerst alle inzendingen als bewijslast of voor later gebruik, alvorens de feed te wissen.</p>
+        <button class="btn-download" onclick="downloadResultaten()">📥 DOWNLOAD ALLES (.TXT)</button>
+        <button class="btn-reset-final" onclick="wisAlles()">⚠️ FEED DEFINITIEF WISSEN</button>
+    </div>
 </div>
 
 <script>
@@ -150,6 +169,8 @@
     firebase.initializeApp(firebaseConfig);
     const database = firebase.database();
 
+    let lokaleDataCopy = {};
+
     // --- LOCATIE FUNCTIES ---
     function wijzigLocatie() {
         const nieuwAdres = document.getElementById('locatie-input').value;
@@ -159,7 +180,6 @@
     database.ref('decor_instellingen/huidige_locatie').on('value', (snapshot) => {
         const locatie = snapshot.val() || "Utrecht Centraal";
         document.getElementById('huidige-locatie-titel').innerText = "📍 Locatie: " + locatie;
-        // Gebruik de standaard Google Maps Embed URL voor adressen
         document.getElementById('map-iframe').src = `https://maps.google.com/maps?q=${encodeURIComponent(locatie)}&t=&z=15&ie=UTF8&iwloc=&output=embed`;
     });
 
@@ -172,10 +192,10 @@
         database.ref('decor_oefeningen').push({
             naam: naam,
             tekst: tekst,
+            timestamp: new Date().toLocaleString(),
             feedback: { c1:false, c2:false, c3:false, c4:false, c5:false, c6:false, opmerking: "" }
         });
         document.getElementById('input-tekst').value = '';
-        alert("Inzending gepubliceerd!");
     }
 
     // --- FEEDBACK FUNCTIES ---
@@ -185,13 +205,39 @@
 
     function publiceerFeedback(key) {
         const feedbackTekst = document.getElementById(`editor-${key}`).value;
-        database.ref('decor_oefeningen/' + key + '/feedback').update({ 
-            opmerking: feedbackTekst 
+        database.ref('decor_oefeningen/' + key + '/feedback').update({ opmerking: feedbackTekst });
+        alert("Feedback gepubliceerd voor deze student.");
+    }
+
+    // --- AFSLUITING & DOWNLOAD ---
+    function downloadResultaten() {
+        if (!lokaleDataCopy || Object.keys(lokaleDataCopy).length === 0) return alert("Geen data om te downloaden.");
+        
+        let inhoud = "RESULTATEN OEFENING: DECORBESCHRIJVING\n";
+        inhoud += "Gegenereerd op: " + new Date().toLocaleString() + "\n";
+        inhoud += "--------------------------------------------------\n\n";
+
+        Object.keys(lokaleDataCopy).forEach(key => {
+            const item = lokaleDataCopy[key];
+            inhoud += `VERBALISANT: ${item.naam}\n`;
+            inhoud += `TIJDSTIP: ${item.timestamp || 'onbekend'}\n`;
+            inhoud += `BESCHRIJVING:\n${item.tekst}\n\n`;
+            inhoud += `FEEDBACK DOCENT:\n${item.feedback.opmerking || "Geen opmerkingen"}\n`;
+            inhoud += `--------------------------------------------------\n\n`;
         });
+
+        const blob = new Blob([inhoud], { type: 'text/plain' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `Decoroefening_Resultaten_${new Date().toLocaleDateString()}.txt`;
+        link.click();
     }
 
     function wisAlles() { 
-        if(confirm("Weet je zeker dat je de hele feed wilt wissen?")) database.ref('decor_oefeningen').remove(); 
+        if(confirm("LET OP: Dit verwijdert alle inzendingen definitief uit de database. Heb je de download al gemaakt?")) {
+            database.ref('decor_oefeningen').remove();
+            alert("Database is gereset.");
+        }
     }
 
     // --- LIVE FEED RENDEREN ---
@@ -199,6 +245,7 @@
         const feed = document.getElementById('live-feed');
         feed.innerHTML = '';
         const data = snapshot.val();
+        lokaleDataCopy = data; // Bewaar voor download
         
         if (data) {
             Object.keys(data).reverse().forEach(key => {
@@ -211,11 +258,9 @@
                     <div class="tekst-sectie">
                         <strong>Verbalisant: ${item.naam}</strong>
                         <div class="pv-tekst">${item.tekst}</div>
-                        
-                        ${fb.opmerking ? `
-                        <div style="margin-top:20px; border-top: 2px solid var(--gold); padding-top:15px;">
-                            <strong style="font-size:0.9em; color:#856404;">DEFINITIEVE FEEDBACK:</strong>
-                            <p style="color: #1d4e89; font-style: italic; background: #f0f4f8; padding: 10px; border-radius: 5px;">${fb.opmerking}</p>
+                        ${fb.opmerking ? `<div style="margin-top:20px; border-top: 2px solid var(--gold); padding-top:15px; background: #f0f4f8; padding: 15px; border-radius: 8px;">
+                            <strong style="color:var(--police-blue);">FEEDBACK DOCENT:</strong>
+                            <p style="white-space: pre-wrap; font-style: italic;">${fb.opmerking}</p>
                         </div>` : ''}
                     </div>
                     <div class="feedback-sectie">
@@ -228,15 +273,15 @@
                             <li class="${fb.c5?'checked':'unchecked'}"><input type="checkbox" ${fb.c5?'checked':''} onchange="updateCheck('${key}','c5',this.checked)"> Van groot naar klein</li>
                             <li class="${fb.c6?'checked':'unchecked'}"><input type="checkbox" ${fb.c6?'checked':''} onchange="updateCheck('${key}','c6',this.checked)"> Element = Onderwerp</li>
                         </ul>
-                        <div class="feedback-display">${fb.opmerking || "Nog geen definitieve feedback..." }</div>
-                        <textarea id="editor-${key}" class="feedback-editor" placeholder="Typ hier de feedback (meer dan 100 woorden mogelijk)...">${fb.opmerking || ""}</textarea>
-                        <button class="btn-feedback-publiceer" onclick="publiceerFeedback('${key}')">FEEDBACK PUBLICEREN</button>
+                        <div class="feedback-display">${fb.opmerking || "Wachtend op feedback..." }</div>
+                        <textarea id="editor-${key}" class="feedback-editor" placeholder="Typ hier uitgebreide feedback...">${fb.opmerking || ""}</textarea>
+                        <button class="btn-feedback-publiceer" onclick="publiceerFeedback('${key}')">PUBLICEER FEEDBACK</button>
                     </div>
                 `;
                 feed.appendChild(kaart);
             });
         } else {
-            feed.innerHTML = '<p style="text-align:center; color:#666;">Geen inzendingen gevonden.</p>';
+            feed.innerHTML = '<p style="text-align:center; color:#666; padding: 20px;">Geen inzendingen gevonden.</p>';
         }
     });
 </script>
