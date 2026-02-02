@@ -124,7 +124,7 @@
     </div>
 
     <div class="admin-panel">
-        <strong>DOCENT:</strong> 
+        <strong>LOCATIE BEHEER:</strong> 
         <input type="text" id="locatie-input" placeholder="Adres (bijv. Dam 1, Amsterdam)">
         <button class="btn-admin" onclick="wijzigLocatie()">LOCATIE UPDATEN</button>
     </div>
@@ -150,7 +150,7 @@
 
     <div class="end-session-panel">
         <h3>Einde Les: Administratie & Opslag</h3>
-        <p>Download eerst alle inzendingen als bewijslast of voor later gebruik, alvorens de feed te wissen.</p>
+        <p>Download eerst alle inzendingen alvorens de feed te wissen.</p>
         <button class="btn-download" onclick="downloadResultaten()">📥 DOWNLOAD ALLES (.TXT)</button>
         <button class="btn-reset-final" onclick="wisAlles()">⚠️ FEED DEFINITIEF WISSEN</button>
     </div>
@@ -171,7 +171,6 @@
 
     let lokaleDataCopy = {};
 
-    // --- LOCATIE FUNCTIES ---
     function wijzigLocatie() {
         const nieuwAdres = document.getElementById('locatie-input').value;
         if(nieuwAdres) database.ref('decor_instellingen').update({ huidige_locatie: nieuwAdres });
@@ -183,7 +182,6 @@
         document.getElementById('map-iframe').src = `https://maps.google.com/maps?q=${encodeURIComponent(locatie)}&t=&z=15&ie=UTF8&iwloc=&output=embed`;
     });
 
-    // --- DATA VERZENDEN ---
     function verstuurData() {
         const naam = document.getElementById('student-naam').value;
         const tekst = document.getElementById('input-tekst').value;
@@ -198,7 +196,6 @@
         document.getElementById('input-tekst').value = '';
     }
 
-    // --- FEEDBACK FUNCTIES ---
     function updateCheck(key, field, value) { 
         database.ref('decor_oefeningen/' + key + '/feedback').update({ [field]: value }); 
     }
@@ -206,10 +203,9 @@
     function publiceerFeedback(key) {
         const feedbackTekst = document.getElementById(`editor-${key}`).value;
         database.ref('decor_oefeningen/' + key + '/feedback').update({ opmerking: feedbackTekst });
-        alert("Feedback gepubliceerd voor deze student.");
+        alert("Feedback gepubliceerd.");
     }
 
-    // --- AFSLUITING & DOWNLOAD ---
     function downloadResultaten() {
         if (!lokaleDataCopy || Object.keys(lokaleDataCopy).length === 0) return alert("Geen data om te downloaden.");
         
@@ -220,32 +216,30 @@
         Object.keys(lokaleDataCopy).forEach(key => {
             const item = lokaleDataCopy[key];
             inhoud += `VERBALISANT: ${item.naam}\n`;
-            inhoud += `TIJDSTIP: ${item.timestamp || 'onbekend'}\n`;
             inhoud += `BESCHRIJVING:\n${item.tekst}\n\n`;
-            inhoud += `FEEDBACK DOCENT:\n${item.feedback.opmerking || "Geen opmerkingen"}\n`;
+            inhoud += `FEEDBACK:\n${item.feedback.opmerking || "Geen opmerkingen"}\n`;
             inhoud += `--------------------------------------------------\n\n`;
         });
 
         const blob = new Blob([inhoud], { type: 'text/plain' });
         const link = document.createElement('a');
         link.href = URL.createObjectURL(blob);
-        link.download = `Decoroefening_Resultaten_${new Date().toLocaleDateString()}.txt`;
+        link.download = `Decoroefening_Resultaten.txt`;
         link.click();
     }
 
     function wisAlles() { 
-        if(confirm("LET OP: Dit verwijdert alle inzendingen definitief uit de database. Heb je de download al gemaakt?")) {
+        if(confirm("LET OP: Dit verwijdert alle inzendingen. Heb je de download al gemaakt?")) {
             database.ref('decor_oefeningen').remove();
             alert("Database is gereset.");
         }
     }
 
-    // --- LIVE FEED RENDEREN ---
     database.ref('decor_oefeningen').on('value', (snapshot) => {
         const feed = document.getElementById('live-feed');
         feed.innerHTML = '';
         const data = snapshot.val();
-        lokaleDataCopy = data; // Bewaar voor download
+        lokaleDataCopy = data; 
         
         if (data) {
             Object.keys(data).reverse().forEach(key => {
@@ -259,7 +253,7 @@
                         <strong>Verbalisant: ${item.naam}</strong>
                         <div class="pv-tekst">${item.tekst}</div>
                         ${fb.opmerking ? `<div style="margin-top:20px; border-top: 2px solid var(--gold); padding-top:15px; background: #f0f4f8; padding: 15px; border-radius: 8px;">
-                            <strong style="color:var(--police-blue);">FEEDBACK DOCENT:</strong>
+                            <strong style="color:var(--police-blue);">FEEDBACK:</strong>
                             <p style="white-space: pre-wrap; font-style: italic;">${fb.opmerking}</p>
                         </div>` : ''}
                     </div>
@@ -274,7 +268,7 @@
                             <li class="${fb.c6?'checked':'unchecked'}"><input type="checkbox" ${fb.c6?'checked':''} onchange="updateCheck('${key}','c6',this.checked)"> Element = Onderwerp</li>
                         </ul>
                         <div class="feedback-display">${fb.opmerking || "Wachtend op feedback..." }</div>
-                        <textarea id="editor-${key}" class="feedback-editor" placeholder="Typ hier uitgebreide feedback...">${fb.opmerking || ""}</textarea>
+                        <textarea id="editor-${key}" class="feedback-editor" placeholder="Typ hier de feedback...">${fb.opmerking || ""}</textarea>
                         <button class="btn-feedback-publiceer" onclick="publiceerFeedback('${key}')">PUBLICEER FEEDBACK</button>
                     </div>
                 `;
